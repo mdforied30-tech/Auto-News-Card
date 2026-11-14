@@ -1,13 +1,17 @@
 import { renderCard, ensureFonts, FORMATS } from './render.js';
-import { TEMPLATES } from './templates.js';
+import { TEMPLATES, TEMPLATE_CATS } from './templates.js';
 import { FONTS } from './draw.js';
 
 const $ = (s) => document.querySelector(s);
 const FN = '/.netlify/functions/';
 const MAX_PHOTOS = 4;
 const MAX_PHOTO_PX = 2000;
+const MAX_CUSTOM_FONTS = 6;
+const DEFAULT_CTA = 'বিস্তারিত কমেন্টে';
+const FONT_SAMPLE = 'আমার সংবাদ শোক ব্রেকিং খেলা অআকখগ ০১২৩৪৫৬৭৮৯';
 
 const DEFAULT_BRAND = { name: '', website: '', primary: '#0f766e', accent: '#f59e0b', logoData: '' };
+const bn = (v) => String(v).replace(/\d/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
 
 /* ---------- storage (never trust it to exist) ---------- */
 
@@ -40,16 +44,17 @@ function bnDate() {
   }
 }
 
-const prefs = store.get('anc.prefs', {});
+const prefs = store.get('anc.prefs', {}) || {};
 const state = {
   headline: '',
   subtitle: '',
   category: '',
   speaker: '',
+  cta: typeof prefs.cta === 'string' ? prefs.cta : DEFAULT_CTA,
   date: bnDate(),
   template: TEMPLATES.some((t) => t.id === prefs.template) ? prefs.template : 'breaking',
   format: FORMATS[prefs.format] ? prefs.format : 'square',
-  fontKey: prefs.fontKey === 'auto' || FONTS[prefs.fontKey] ? prefs.fontKey : 'auto',
+  fontKey: typeof prefs.fontKey === 'string' ? prefs.fontKey : 'auto', // checked again after custom fonts load
   accent: '',
   textScale: typeof prefs.textScale === 'number' && prefs.textScale >= 0.7 && prefs.textScale <= 1.3 ? prefs.textScale : 1,
   focusX: 0.5,
@@ -85,8 +90,39 @@ function setStatus(el, msg, kind) {
 }
 
 function savePrefs() {
-  store.set('anc.prefs', { template: state.template, format: state.format, fontKey: state.fontKey, textScale: state.textScale });
+  store.set('anc.prefs', { template: state.template, format: state.format, fontKey: state.fontKey, textScale: state.textScale, cta: state.cta });
 }
+
+/* ---------- page zoom (A− / A+) ---------- */
+
+const UI_MIN = 70;
+const UI_MAX = 124;
+const UI_STEP = 6;
+let uiPct = Number(store.get('anc.ui', 88));
+if (!Number.isFinite(uiPct) || uiPct < UI_MIN || uiPct > UI_MAX) uiPct = 88;
+
+function applyUi() {
+  document.documentElement.style.fontSize = (16 * uiPct) / 100 + 'px';
+  $('#zoomVal').textContent = bn(uiPct) + '%';
+  $('#zoomOut').disabled = uiPct <= UI_MIN;
+  $('#zoomIn').disabled = uiPct >= UI_MAX;
+  measurePreview();
+}
+function stepUi(d) {
+  uiPct = Math.max(UI_MIN, Math.min(UI_MAX, uiPct + d * UI_STEP));
+  store.set('anc.ui', uiPct);
+  applyUi();
+}
+$('#zoomOut').addEventListener('click', () => stepUi(-1));
+$('#zoomIn').addEventListener('click', () => stepUi(1));
+
+/** The tab bar sticks right under the (sticky) preview, so it needs to know the preview's height. */
+function measurePreview() {
+  const p = $('#preview');
+  document.documentElement.style.setProperty('--prev-h', p.offsetHeight + 'px');
+}
+if (window.ResizeObserver) new ResizeObserver(measurePreview).observe($('#preview'));
+window.addEventListener('resize', measurePreview);
 
 /* ---------- images ---------- */
 
@@ -104,8 +140,7 @@ function toCanvas(source, maxPx) {
 }
 
 function makeThumb(c) {
-  const t = toCanvas(c, 220);
-  return t.toDataURL('image/jpeg', 0.75);
+  return toCanvas(c, 220).toDataURL('image/jpeg', 0.75);
 }
 
 async function decodeBlob(blob) {
@@ -119,7 +154,7 @@ async function decodeBlob(blob) {
   const url = URL.createObjectURL(blob);
   try {
     const img = new Image();
-    img.decode ? (img.src = url, await img.decode()) : await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+    img.decode ? ((img.src = url), await img.decode()) : await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
     return img;
   } finally {
     URL.revokeObjectURL(url);
@@ -163,7 +198,7 @@ function drawPhotoList() {
     b.tabIndex = 0;
     b.setAttribute('role', 'button');
     b.setAttribute('aria-pressed', String(i === photoSel));
-    b.setAttribute('aria-label', 'ছবি ' + (i + 1));
+    b.setAttribute('aria-label', 'ছবি ' + bn(i + 1));
     const img = document.createElement('img');
     img.src = p.thumb;
     img.alt = '';
@@ -213,7 +248,7 @@ $('#photoInput').addEventListener('change', async (e) => {
   let failed = 0;
   for (const f of files) {
     if (photos.length >= MAX_PHOTOS) {
-      toast('সর্বোচ্চ ' + MAX_PHOTOS + 'টি ছবি দেওয়া যায়');
+      toast('সর্বোচ্চ ' + bn(MAX_PHOTOS) + 'টি ছবি দেওয়া যায়');
       break;
     }
     try {
@@ -223,11 +258,50 @@ $('#photoInput').addEventListener('change', async (e) => {
       failed++;
     }
   }
-  if (failed) toast(failed + 'টি ছবি খোলা যায়নি (JPG বা PNG দিন)');
+  if (failed) toast(bn(failed) + 'টি ছবি খোলা যায়নি (JPG বা PNG দিন)');
   syncAdjust();
   drawPhotoList();
   requestRender();
 });
+
+/** A nice-looking stand-in photo, used only in the small design previews while no photo is chosen. */
+let placeholder = null;
+function placeholderPhoto() {
+  if (placeholder) return placeholder;
+  const w = 1200;
+  const h = 900;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const x = c.getContext('2d');
+  const sky = x.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, '#2b5a8a');
+  sky.addColorStop(0.55, '#e9a063');
+  sky.addColorStop(1, '#2a3340');
+  x.fillStyle = sky;
+  x.fillRect(0, 0, w, h);
+  x.fillStyle = 'rgba(255,232,170,.92)';
+  x.beginPath();
+  x.arc(w * 0.68, h * 0.46, h * 0.09, 0, Math.PI * 2);
+  x.fill();
+  let s = 11;
+  const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 26; i++) {
+    const bw = w * (0.03 + r() * 0.05);
+    const bh = h * (0.12 + r() * 0.3);
+    x.fillStyle = `rgb(${20 + r() * 25},${28 + r() * 25},${44 + r() * 25})`;
+    x.fillRect((i * w) / 24 - 10, h * 0.78 - bh, bw, bh + h);
+  }
+  x.fillStyle = '#16202b';
+  x.fillRect(0, h * 0.8, w, h * 0.2);
+  x.fillStyle = '#0b0f14';
+  x.beginPath();
+  x.arc(w * 0.32, h * 0.52, h * 0.07, 0, Math.PI * 2);
+  x.fill();
+  x.fillRect(w * 0.32 - h * 0.1, h * 0.58, h * 0.2, h * 0.3);
+  placeholder = c;
+  return c;
+}
 
 /* ---------- news link ---------- */
 
@@ -248,7 +322,7 @@ async function readError(res) {
     /* not json */
   }
   if (res.status === 404) return 'ফাংশন পাওয়া যায়নি — সাইটটি Netlify-তে ডিপ্লয় করা আছে কি দেখুন';
-  return 'কিছু একটা সমস্যা হয়েছে (কোড ' + res.status + ')';
+  return 'কিছু একটা সমস্যা হয়েছে (কোড ' + bn(res.status) + ')';
 }
 
 let fetching = false;
@@ -285,8 +359,9 @@ async function fetchNews() {
     photos.length = 0;
     photoSel = -1;
     let got = 0;
+    const list = data.images || [];
     await Promise.all(
-      (data.images || []).map(async (src) => {
+      list.map(async (src, order) => {
         try {
           const r = await fetch(FN + 'proxy-image?url=' + encodeURIComponent(src));
           if (!r.ok) return;
@@ -295,7 +370,7 @@ async function fetchNews() {
           const c = toCanvas(bmp, MAX_PHOTO_PX);
           if (bmp.close) bmp.close();
           if (c.width < 200 || c.height < 120) return;
-          photos.push({ id: nextPhotoId++, canvas: c, thumb: makeThumb(c), order: (data.images || []).indexOf(src) });
+          photos.push({ id: nextPhotoId++, canvas: c, thumb: makeThumb(c), order });
           got++;
         } catch {
           /* skip this image */
@@ -309,11 +384,11 @@ async function fetchNews() {
     state.zoom = 1;
     syncAdjust();
     drawPhotoList();
-    requestRender();
+    requestRender({ swap: true });
 
     if (!data.title) setStatus(status, 'ছবি এসেছে, তবে হেডলাইন পাওয়া যায়নি — নিজে লিখে নিন।', 'ok');
     else if (!got) setStatus(status, 'হেডলাইন এসেছে, কিন্তু ছবি পাওয়া যায়নি — নিজে ছবি দিন।', 'ok');
-    else setStatus(status, '✓ হেডলাইন ও ' + got + 'টি ছবি এসেছে। চাইলে নিচে বদলে নিন।', 'ok');
+    else setStatus(status, '✓ হেডলাইন ও ' + bn(got) + 'টি ছবি এসেছে। চাইলে বদলে নিন।', 'ok');
   } catch (e) {
     setStatus(status, e.message || 'খবর আনা যায়নি', 'err');
   } finally {
@@ -343,11 +418,12 @@ $('#pasteBtn').addEventListener('click', async () => {
 
 /* ---------- text fields ---------- */
 
-function bind(id, key) {
+function bind(id, key, after) {
   const el = $(id);
   el.value = state[key] || '';
   el.addEventListener('input', () => {
     state[key] = el.value;
+    if (after) after();
     requestRender();
   });
 }
@@ -355,6 +431,7 @@ bind('#headline', 'headline');
 bind('#subtitle', 'subtitle');
 bind('#category', 'category');
 bind('#speaker', 'speaker');
+bind('#cta', 'cta', savePrefs);
 bind('#date', 'date');
 
 $('#hlBtn').addEventListener('click', () => {
@@ -408,15 +485,16 @@ $('#aiBtn').addEventListener('click', async () => {
 
     const heads = $('#aiHeads');
     heads.textContent = '';
-    (data.headlines || []).forEach((h) => {
+    (data.headlines || []).forEach((h, i) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'chip';
+      b.style.setProperty('--i', i);
       b.textContent = h.replace(/\*/g, '');
       b.addEventListener('click', () => {
         $('#headline').value = h;
         state.headline = h;
-        requestRender();
+        requestRender({ swap: true });
         toast('হেডলাইন বসানো হয়েছে');
       });
       heads.append(b);
@@ -444,9 +522,77 @@ $('#copyCaption').addEventListener('click', async () => {
   }
 });
 
-/* ---------- templates, formats, design ---------- */
+/* ---------- tabs ---------- */
 
-const tplButtons = new Map();
+const TABS = ['news', 'text', 'design', 'style'];
+
+function showTab(name, scroll) {
+  if (!TABS.includes(name)) return;
+  TABS.forEach((t) => {
+    const on = t === name;
+    $('#tab-' + t).setAttribute('aria-selected', String(on));
+    $('#tab-' + t).tabIndex = on ? 0 : -1;
+    $('#p-' + t).hidden = !on;
+  });
+  if (scroll) {
+    // Only scroll when the page has been scrolled past the top of the editor.
+    const tabs = $('#tabs');
+    const top = $('#editor').getBoundingClientRect().top;
+    const limit = tabs.getBoundingClientRect().bottom;
+    if (top < limit - 4) window.scrollBy({ top: top - limit - 8, behavior: 'smooth' });
+  }
+  if (name === 'design') queueVisibleThumbs();
+}
+
+document.querySelectorAll('.tab').forEach((b) => {
+  b.addEventListener('click', () => showTab(b.dataset.tab, true));
+  b.addEventListener('keydown', (e) => {
+    const i = TABS.indexOf(b.dataset.tab);
+    let n = -1;
+    if (e.key === 'ArrowRight') n = (i + 1) % TABS.length;
+    if (e.key === 'ArrowLeft') n = (i + TABS.length - 1) % TABS.length;
+    if (n >= 0) {
+      e.preventDefault();
+      showTab(TABS[n], false);
+      $('#tab-' + TABS[n]).focus();
+    }
+  });
+});
+document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.go, true)));
+
+/* ---------- design: categories, templates, sizes ---------- */
+
+const tplButtons = new Map(); // id -> { b, c, t }
+const canvasToTpl = new Map(); // canvas -> template id
+let curCat = 'all';
+
+function buildCats() {
+  const box = $('#catList');
+  TEMPLATE_CATS.forEach((cat) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cat';
+    b.dataset.cat = cat.id;
+    b.textContent = cat.label;
+    b.addEventListener('click', () => {
+      curCat = cat.id;
+      applyCat();
+    });
+    box.append(b);
+  });
+}
+
+function applyCat() {
+  let n = 0;
+  tplButtons.forEach(({ b, t }) => {
+    const show = curCat === 'all' || t.cat === curCat;
+    b.hidden = !show;
+    if (show) b.style.setProperty('--i', n++);
+  });
+  $('#tplCount').textContent = '(' + bn(n) + 'টি)';
+  document.querySelectorAll('.cat').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cat === curCat)));
+}
+
 function buildTemplates() {
   const box = $('#tplList');
   TEMPLATES.forEach((t) => {
@@ -454,21 +600,26 @@ function buildTemplates() {
     b.type = 'button';
     b.className = 'tpl';
     b.setAttribute('role', 'option');
+    b.setAttribute('aria-label', t.label);
     const c = document.createElement('canvas');
     c.setAttribute('aria-hidden', 'true');
     const s = document.createElement('span');
     s.textContent = t.label;
     b.append(c, s);
-    b.addEventListener('click', () => {
-      state.template = t.id;
-      savePrefs();
-      refreshSelection();
-      requestRender();
-      if (t.id === 'quote') $('#more').open = true;
-    });
+    b.addEventListener('click', () => selectTemplate(t.id));
     box.append(b);
-    tplButtons.set(t.id, { b, c });
+    tplButtons.set(t.id, { b, c, t });
+    canvasToTpl.set(c, t.id);
+    thumbObserver && thumbObserver.observe(c);
   });
+}
+
+function selectTemplate(id) {
+  state.template = id;
+  savePrefs();
+  refreshSelection();
+  requestRender({ swap: true });
+  if (id === 'quote' || id === 'quoteRing') toast('বক্তার নাম ও পরিচয় "লেখা" ট্যাবে দিন');
 }
 
 function buildFormats() {
@@ -486,7 +637,7 @@ function buildFormats() {
       state.format = id;
       savePrefs();
       refreshSelection();
-      requestRender();
+      requestRender({ swap: true });
     });
     box.append(b);
   });
@@ -495,29 +646,251 @@ function buildFormats() {
 function refreshSelection() {
   tplButtons.forEach(({ b }, id) => b.setAttribute('aria-selected', String(id === state.template)));
   document.querySelectorAll('#fmtList button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.id === state.format)));
-  $('#speakerField').hidden = state.template !== 'quote';
+  $('#tplList').dataset.fmt = state.format;
+  $('#speakerField').hidden = !(state.template === 'quote' || state.template === 'quoteRing');
+}
+
+/* ---------- design thumbnails: drawn only when they scroll into view ---------- */
+
+const visibleThumbs = new Set();
+const thumbQueue = new Set();
+let thumbRunning = false;
+
+const thumbObserver =
+  typeof IntersectionObserver === 'function'
+    ? new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) {
+              visibleThumbs.add(e.target);
+              thumbQueue.add(e.target);
+            } else visibleThumbs.delete(e.target);
+          }
+          runThumbs();
+        },
+        { rootMargin: '160px' }
+      )
+    : null;
+
+function queueVisibleThumbs() {
+  visibleThumbs.forEach((c) => thumbQueue.add(c));
+  runThumbs();
+}
+
+const fontReady = new Map();
+function loadFontKey(key) {
+  if (fontReady.has(key)) return fontReady.get(key);
+  const f = FONTS[key] || FONTS.hind;
+  const job =
+    document.fonts && document.fonts.load
+      ? Promise.race([document.fonts.load(`${f.weight} 40px "${f.family}"`, FONT_SAMPLE).catch(() => {}), new Promise((r) => setTimeout(r, 3500))])
+      : Promise.resolve();
+  fontReady.set(key, job);
+  return job;
+}
+
+async function runThumbs() {
+  if (thumbRunning) return;
+  thumbRunning = true;
+  try {
+    while (thumbQueue.size) {
+      const cv = thumbQueue.values().next().value;
+      thumbQueue.delete(cv);
+      if (!visibleThumbs.has(cv)) continue;
+      const id = canvasToTpl.get(cv);
+      const entry = tplButtons.get(id);
+      if (!entry) continue;
+      const key = state.fontKey && state.fontKey !== 'auto' && FONTS[state.fontKey] ? state.fontKey : entry.t.font;
+      await loadFontKey(key);
+      if (!visibleThumbs.has(cv)) continue;
+      try {
+        const f = FORMATS[state.format];
+        renderCard(cv, { state: { ...state, template: id }, brand, photo: currentPhoto() || placeholderPhoto(), logo: logoImg }, 230 / f.w);
+      } catch (e) {
+        console.error(e);
+      }
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  } finally {
+    thumbRunning = false;
+  }
+}
+
+/* ---------- fonts ---------- */
+
+function sampleFamily(key) {
+  const f = FONTS[key];
+  return f ? `"${f.family}", "Hind Siliguri", sans-serif` : '';
 }
 
 function buildFonts() {
-  const sel = $('#fontSel');
-  const auto = document.createElement('option');
-  auto.value = 'auto';
-  auto.textContent = 'টেমপ্লেটের নিজস্ব ফন্ট';
-  sel.append(auto);
-  Object.entries(FONTS).forEach(([k, f]) => {
-    const o = document.createElement('option');
-    o.value = k;
-    o.textContent = f.label;
-    sel.append(o);
+  const box = $('#fontList');
+  box.textContent = '';
+  const items = [['auto', { label: 'টেমপ্লেটের নিজস্ব ফন্ট', family: 'Hind Siliguri', weight: 700 }], ...Object.entries(FONTS)];
+  items.forEach(([key, f], i) => {
+    const custom = !!f.custom;
+    const b = document.createElement(custom ? 'div' : 'button');
+    if (!custom) b.type = 'button';
+    else b.tabIndex = 0;
+    b.className = 'fontbtn';
+    b.dataset.key = key;
+    b.setAttribute('role', 'option');
+    b.style.setProperty('--i', i);
+    const label = document.createElement('small');
+    label.textContent = f.label;
+    const sample = document.createElement('span');
+    sample.className = 'sample';
+    sample.textContent = 'আমার সংবাদ ১২৩';
+    sample.style.fontFamily = key === 'auto' ? '"Hind Siliguri", sans-serif' : sampleFamily(key);
+    sample.style.fontWeight = String(f.weight);
+    b.append(label, sample);
+    if (custom) {
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'fdel';
+      del.textContent = '×';
+      del.setAttribute('aria-label', 'ফন্টটি মুছুন');
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeCustomFont(key);
+      });
+      b.append(del);
+    }
+    const choose = () => {
+      state.fontKey = key;
+      savePrefs();
+      markFont();
+      requestRender({ swap: true });
+      queueVisibleThumbs();
+    };
+    b.addEventListener('click', choose);
+    if (custom) b.addEventListener('keydown', (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), choose()));
+    box.append(b);
   });
-  sel.value = state.fontKey;
-  sel.addEventListener('change', () => {
-    state.fontKey = sel.value;
-    savePrefs();
-    requestRender();
+  markFont();
+}
+
+function markFont() {
+  document.querySelectorAll('.fontbtn').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.key === state.fontKey)));
+}
+
+/* ---------- your own fonts (saved in this browser with IndexedDB) ---------- */
+
+function openDb() {
+  return new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error('no indexedDB'));
+    const r = indexedDB.open('anc-fonts', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('fonts', { keyPath: 'id' });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function dbRun(mode, fn) {
+  const db = await openDb();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('fonts', mode);
+    const req = fn(tx.objectStore('fonts'));
+    tx.oncomplete = () => res(req && req.result);
+    tx.onerror = () => rej(tx.error);
+    tx.onabort = () => rej(tx.error);
   });
 }
 
+async function registerCustomFont(rec) {
+  const face = new FontFace(rec.family, rec.data, { weight: '100 900' });
+  await face.load();
+  document.fonts.add(face);
+  FONTS[rec.key] = { label: rec.name, family: rec.family, weight: 700, custom: true };
+}
+
+async function loadCustomFonts() {
+  try {
+    const all = (await dbRun('readonly', (s) => s.getAll())) || [];
+    for (const rec of all.slice(0, MAX_CUSTOM_FONTS)) {
+      try {
+        await registerCustomFont(rec);
+      } catch {
+        /* broken font file: skip it */
+      }
+    }
+  } catch {
+    /* IndexedDB blocked: custom fonts just won't be remembered */
+  }
+}
+
+async function removeCustomFont(key) {
+  const f = FONTS[key];
+  if (!f) return;
+  const id = Number(String(key).replace('cf', ''));
+  delete FONTS[key];
+  fontReady.delete(key);
+  try {
+    await dbRun('readwrite', (s) => s.delete(id));
+  } catch {
+    /* ignore */
+  }
+  if (state.fontKey === key) {
+    state.fontKey = 'auto';
+    savePrefs();
+  }
+  buildFonts();
+  requestRender();
+  queueVisibleThumbs();
+  toast('ফন্ট মুছে ফেলা হয়েছে');
+}
+
+$('#fontAdd').addEventListener('click', () => {
+  if (Object.values(FONTS).filter((f) => f.custom).length >= MAX_CUSTOM_FONTS) return toast('সর্বোচ্চ ' + bn(MAX_CUSTOM_FONTS) + 'টি নিজের ফন্ট রাখা যায়');
+  $('#fontFile').click();
+});
+$('#fontFile').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (!/\.(ttf|otf|woff2?)$/i.test(file.name)) return toast('শুধু .ttf, .otf বা .woff ফন্ট চলবে');
+  if (file.size > 8 * 1024 * 1024) return toast('ফন্ট ফাইলটি অনেক বড় (৮ MB এর কম দিন)');
+  try {
+    const data = await file.arrayBuffer();
+    const id = Date.now();
+    const name = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 28) || 'আমার ফন্ট';
+    const rec = { id, key: 'cf' + id, family: 'ANC Custom ' + id, name, data };
+    await registerCustomFont(rec);
+    let saved = true;
+    try {
+      await dbRun('readwrite', (s) => s.put(rec));
+    } catch {
+      saved = false;
+    }
+    state.fontKey = rec.key;
+    savePrefs();
+    buildFonts();
+    requestRender({ swap: true });
+    queueVisibleThumbs();
+    toast(saved ? 'ফন্ট যোগ হয়েছে ✓' : 'ফন্ট যোগ হয়েছে (এই সেশনের জন্য)');
+  } catch {
+    toast('ফন্টটি খোলা যায়নি, অন্য ফাইল দিন');
+  }
+});
+
+/* ---------- colours, size, photo position ---------- */
+
+const SWATCHES = ['#f59e0b', '#fbbf24', '#ef4444', '#f97316', '#22c55e', '#06b6d4', '#3b82f6', '#a855f7', '#ec4899', '#ffffff'];
+function buildSwatches() {
+  const box = $('#swatches');
+  SWATCHES.forEach((col) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sw';
+    b.style.background = col;
+    b.setAttribute('aria-label', 'রং ' + col);
+    b.addEventListener('click', () => {
+      state.accent = col;
+      $('#accent').value = col;
+      requestRender();
+    });
+    box.append(b);
+  });
+}
 $('#accent').addEventListener('input', (e) => {
   state.accent = e.target.value;
   requestRender();
@@ -543,9 +916,11 @@ $('#textScale').addEventListener('input', (e) => {
 /* ---------- drawing ---------- */
 
 let renderQueued = false;
+let swapNext = false;
 let thumbTimer;
 
-function requestRender() {
+function requestRender(opts) {
+  if (opts && opts.swap) swapNext = true;
   if (renderQueued) return;
   renderQueued = true;
   requestAnimationFrame(async () => {
@@ -557,7 +932,7 @@ function requestRender() {
       console.error(e);
     }
     clearTimeout(thumbTimer);
-    thumbTimer = setTimeout(drawThumbs, 280);
+    thumbTimer = setTimeout(queueVisibleThumbs, 260);
   });
 }
 
@@ -568,23 +943,17 @@ function input() {
 function drawMain() {
   renderCard(canvas, input(), 1);
   const f = FORMATS[state.format];
-  canvas.setAttribute('aria-label', 'নিউজ কার্ড, ' + f.w + '×' + f.h);
+  canvas.setAttribute('aria-label', 'নিউজ কার্ড, ' + bn(f.w) + '×' + bn(f.h));
+  if (swapNext) {
+    swapNext = false;
+    canvas.classList.remove('swap');
+    void canvas.offsetWidth; // restart the pop animation
+    canvas.classList.add('swap');
+  }
+  measurePreview();
 }
 
-function drawThumbs() {
-  const f = FORMATS[state.format];
-  const scale = 260 / f.w;
-  const base = input();
-  tplButtons.forEach(({ c }, id) => {
-    try {
-      renderCard(c, { ...base, state: { ...state, template: id } }, scale);
-    } catch (e) {
-      console.error(e);
-    }
-  });
-}
-
-/* ---------- download / share ---------- */
+/* ---------- download / share / big preview ---------- */
 
 function fileName(ext) {
   const d = new Date();
@@ -601,6 +970,31 @@ async function renderBlob(type) {
   return blob;
 }
 
+let popTimer;
+function celebrate() {
+  const pop = $('#donePop');
+  const box = $('#confetti');
+  box.textContent = '';
+  const colors = ['#14b8a6', '#f59e0b', '#ec4899', '#6366f1', '#22c55e', '#ef4444'];
+  for (let i = 0; i < 28; i++) {
+    const e = document.createElement('i');
+    const a = Math.random() * Math.PI * 2;
+    const d = 70 + Math.random() * 130;
+    e.style.setProperty('--dx', Math.cos(a) * d + 'px');
+    e.style.setProperty('--dy', Math.sin(a) * d - 50 + 'px');
+    e.style.setProperty('--rot', Math.round(Math.random() * 720 - 360) + 'deg');
+    e.style.setProperty('--d', String(Math.round(Math.random() * 140)));
+    e.style.background = colors[i % colors.length];
+    box.append(e);
+  }
+  pop.hidden = false;
+  clearTimeout(popTimer);
+  popTimer = setTimeout(() => (pop.hidden = true), 1900);
+}
+$('#donePop').addEventListener('click', () => {
+  $('#donePop').hidden = true;
+});
+
 async function download(type, ext) {
   try {
     const blob = await renderBlob(type);
@@ -612,7 +1006,7 @@ async function download(type, ext) {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    toast('ডাউনলোড শুরু হয়েছে');
+    celebrate();
   } catch (e) {
     toast(e.message || 'ডাউনলোড করা যায়নি');
   }
@@ -638,6 +1032,40 @@ $('#dlJpg').addEventListener('click', () => download('image/jpeg', 'jpg'));
     }
   });
 })();
+
+const viewDlg = $('#viewDlg');
+let viewUrl = '';
+function closeView() {
+  if (viewDlg.close) viewDlg.close();
+  else viewDlg.removeAttribute('open');
+}
+$('#previewOpen').addEventListener('click', async () => {
+  try {
+    const blob = await renderBlob('image/png');
+    if (viewUrl) URL.revokeObjectURL(viewUrl);
+    viewUrl = URL.createObjectURL(blob);
+    $('#viewImg').src = viewUrl;
+    if (typeof viewDlg.showModal === 'function') viewDlg.showModal();
+    else viewDlg.setAttribute('open', '');
+  } catch (e) {
+    toast(e.message || 'প্রিভিউ খোলা যায়নি');
+  }
+});
+$('#viewClose').addEventListener('click', closeView);
+$('#viewDl').addEventListener('click', () => {
+  closeView();
+  download('image/png', 'png');
+});
+viewDlg.addEventListener('click', (e) => {
+  if (e.target === viewDlg) closeView();
+});
+viewDlg.addEventListener('close', () => {
+  if (viewUrl) {
+    URL.revokeObjectURL(viewUrl);
+    viewUrl = '';
+    $('#viewImg').removeAttribute('src');
+  }
+});
 
 /* ---------- brand setup ---------- */
 
@@ -689,6 +1117,9 @@ function closeBrand() {
 $('#openBrand').addEventListener('click', openBrand);
 document.querySelectorAll('[data-open-brand]').forEach((b) => b.addEventListener('click', openBrand));
 $('#brandCancel').addEventListener('click', closeBrand);
+dlg.addEventListener('click', (e) => {
+  if (e.target === dlg) closeBrand();
+});
 $('#logoPick').addEventListener('click', () => $('#logoInput').click());
 $('#logoClear').addEventListener('click', () => {
   draft.logoData = '';
@@ -723,8 +1154,8 @@ $('#brandForm').addEventListener('submit', async (e) => {
   $('#accent').value = state.accent || brand.accent;
   updateBanner();
   closeBrand();
-  requestRender();
-  toast(saved ? 'ব্র্যান্ড সেভ হয়েছে' : 'এই সেশনের জন্য বসানো হয়েছে (ব্রাউজার সেভ করতে দিচ্ছে না)');
+  requestRender({ swap: true });
+  toast(saved ? 'ব্র্যান্ড সেভ হয়েছে ✓' : 'এই সেশনের জন্য বসানো হয়েছে (ব্রাউজার সেভ করতে দিচ্ছে না)');
 });
 
 function updateBanner() {
@@ -734,14 +1165,22 @@ function updateBanner() {
 /* ---------- start ---------- */
 
 async function init() {
+  applyUi();
+  buildCats();
   buildTemplates();
   buildFormats();
-  buildFonts();
+  buildSwatches();
+  applyCat();
   refreshSelection();
   drawPhotoList();
   syncAdjust();
+  showTab('news', false);
   $('#accent').value = state.accent || brand.accent;
   updateBanner();
+
+  await loadCustomFonts();
+  if (state.fontKey !== 'auto' && !FONTS[state.fontKey]) state.fontKey = 'auto';
+  buildFonts();
   logoImg = await loadLogo(brand.logoData);
 
   const q = new URLSearchParams(location.search).get('url');
