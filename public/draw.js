@@ -4,11 +4,18 @@
 
 export const FONTS = {
   hind: { label: 'হিন্দ সিলিগুড়ি', family: 'Hind Siliguri', weight: 700 },
-  noto: { label: 'নোটো সান্স বাংলা', family: 'Noto Sans Bengali', weight: 800 },
+  noto: { label: 'নোটো সান্স', family: 'Noto Sans Bengali', weight: 800 },
   anek: { label: 'আনেক বাংলা', family: 'Anek Bangla', weight: 800 },
-  tiro: { label: 'টিরো বাংলা (সেরিফ)', family: 'Tiro Bangla', weight: 400 },
   baloo: { label: 'বালু দা', family: 'Baloo Da 2', weight: 800 },
+  mina: { label: 'মীনা', family: 'Mina', weight: 700 },
+  atma: { label: 'আত্মা (গোলগাল)', family: 'Atma', weight: 700 },
+  tiro: { label: 'টিরো (সেরিফ)', family: 'Tiro Bangla', weight: 400 },
+  notoserif: { label: 'নোটো সেরিফ', family: 'Noto Serif Bengali', weight: 800 },
+  galada: { label: 'গলদা (হাতের লেখা)', family: 'Galada', weight: 400 },
 };
+
+/** Fonts that use a lighter weight for small text (subtitle, date, footer). */
+export const BODY_FONT = 'hind';
 
 const FALLBACK = '"Hind Siliguri","Noto Sans Bengali","Kalpurush","Nirmala UI","Vrinda","Lohit Bengali",sans-serif';
 

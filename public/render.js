@@ -53,6 +53,7 @@ export function renderCard(canvas, input, scale = 1) {
     hlLight: luminance(A) > 0.5 ? shade(A, -0.45) : A,
     font: state.fontKey && state.fontKey !== 'auto' && FONTS[state.fontKey] ? state.fontKey : tpl.font,
     site: cleanSite(brand.website),
+    cta: String(state.cta || '').trim(),
     headline: (state.headline || '').trim() || SAMPLE_HEADLINE,
     size: (base) => base * u * k * textScale,
   };
