@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>অটো নিউজ কার্ড</title>
+  <meta name="description" content="খবরের লিংক দিন, মিনিটেই প্রফেশনাল নিউজ ফটোকার্ড তৈরি করুন। ২৯টি ডিজাইন, নিজের লোগো ও ব্র্যান্ড রঙসহ বাংলা নিউজ কার্ড মেকার।">
+  <meta name="theme-color" content="#0f766e">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@600;800&family=Noto+Serif+Bengali:wght@700;800&family=Anek+Bangla:wght@600;800&family=Baloo+Da+2:wght@700;800&family=Mina:wght@700&family=Atma:wght@600;700&family=Tiro+Bangla&family=Galada&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-in">
+      <a class="brand" href="./" aria-label="অটো নিউজ কার্ড">
+        <svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="13" fill="#fff"/><rect x="11" y="12" width="26" height="18" rx="4" fill="#0f766e"/><rect x="15" y="17" width="12" height="3" rx="1.5" fill="#fff"/><rect x="15" y="23" width="18" height="3" rx="1.5" fill="#f59e0b"/><path d="M12 35h24" stroke="#0f766e" stroke-width="3" stroke-linecap="round"/></svg>
+        <span>অটো নিউজ কার্ড</span>
+      </a>
+      <div class="top-actions">
+        <div class="zoom" role="group" aria-label="পেজের লেখার সাইজ">
+          <button type="button" id="zoomOut" aria-label="লেখা ছোট করুন">A−</button>
+          <span id="zoomVal" aria-live="polite">৮৮%</span>
+          <button type="button" id="zoomIn" aria-label="লেখা বড় করুন">A+</button>
+        </div>
+        <button type="button" class="btn glass" id="openBrand">⚙ ব্র্যান্ড</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap layout">
+    <section class="preview" id="preview" aria-label="কার্ডের প্রিভিউ">
+      <div class="preview-box">
+        <button type="button" class="preview-open" id="previewOpen" aria-label="কার্ড বড় করে দেখুন">
+          <canvas id="canvas" role="img" aria-label="তৈরি হওয়া নিউজ কার্ড"></canvas>
+          <span class="zoom-hint" aria-hidden="true">🔍 বড় দেখুন</span>
+        </button>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn primary shine" id="dlPng">⬇ ডাউনলোড (PNG)</button>
+        <button type="button" class="btn" id="dlJpg">JPG</button>
+        <button type="button" class="btn" id="shareBtn" hidden>শেয়ার</button>
+      </div>
+    </section>
+
+    <nav class="tabs" id="tabs" role="tablist" aria-label="ধাপ">
+      <button type="button" class="tab" role="tab" id="tab-news" data-tab="news" aria-controls="p-news" aria-selected="true"><i>🔗</i><span>খবর</span></button>
+      <button type="button" class="tab" role="tab" id="tab-text" data-tab="text" aria-controls="p-text" aria-selected="false"><i>✍️</i><span>লেখা</span></button>
+      <button type="button" class="tab" role="tab" id="tab-design" data-tab="design" aria-controls="p-design" aria-selected="false"><i>🎨</i><span>ডিজাইন</span></button>
+      <button type="button" class="tab" role="tab" id="tab-style" data-tab="style" aria-controls="p-style" aria-selected="false"><i>🔤</i><span>ফন্ট</span></button>
+    </nav>
+
+    <div class="editor" id="editor">
+      <div class="banner" id="brandBanner" hidden>
+        <p>কার্ডে আপনার <strong>নাম, লোগো, ওয়েবসাইট ও রং</strong> বসাতে একবার সেটআপ করে নিন।</p>
+        <button type="button" class="btn primary small" data-open-brand>সেটআপ করুন</button>
+      </div>
+
+      <!-- ১. খবর -->
+      <section class="panel" id="p-news" role="tabpanel" aria-labelledby="tab-news">
+        <div class="card" style="--i:0">
+          <h2><span class="num">১</span> খবরের লিংক থেকে আনুন</h2>
+          <p class="hint">হেডলাইন ও ছবি নিজে থেকে বসবে। চাইলে নিজে লিখতে ও ছবি দিতেও পারবেন।</p>
+          <div class="row">
+            <input id="newsUrl" type="url" inputmode="url" autocomplete="off" placeholder="https://yournews.com/news/12345" aria-label="খবরের লিংক">
+            <button type="button" class="btn" id="pasteBtn" title="ক্লিপবোর্ড থেকে পেস্ট">পেস্ট</button>
+            <button type="button" class="btn primary" id="fetchBtn">খবর আনুন</button>
+          </div>
+          <p class="status" id="fetchStatus" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="card" style="--i:1">
+          <h2><span class="num">২</span> খবরের ছবি <small>(সর্বোচ্চ ৪টি)</small></h2>
+          <div class="photos" id="photoList"></div>
+          <input id="photoInput" type="file" accept="image/*" multiple hidden>
+          <details class="adjust" id="adjust" hidden>
+            <summary>ছবির অবস্থান ঠিক করুন</summary>
+            <label class="slider">বাঁ-ডান <input type="range" id="focusX" min="0" max="1" step="0.01" value="0.5"></label>
+            <label class="slider">উপর-নিচ <input type="range" id="focusY" min="0" max="1" step="0.01" value="0.5"></label>
+            <label class="slider">জুম <input type="range" id="zoom" min="1" max="2.5" step="0.05" value="1"></label>
+          </details>
+        </div>
+        <button type="button" class="btn next" data-go="text">পরের ধাপ: লেখা →</button>
+      </section>
+
+      <!-- ২. লেখা -->
+      <section class="panel" id="p-text" role="tabpanel" aria-labelledby="tab-text" hidden>
+        <div class="card" style="--i:0">
+          <h2><span class="num">৩</span> হেডলাইন</h2>
+          <label class="field nolabel">
+            <span class="sr">হেডলাইন</span>
+            <textarea id="headline" rows="3" maxlength="400" placeholder="যেমন: রাশিয়ায় *১২ দেশের* ফিশিং টুর্নামেন্টে অংশ নিলো বাংলাদেশও"></textarea>
+          </label>
+          <p class="hint">যে শব্দ রঙিন করতে চান সেটি <b>*তারকা চিহ্নের*</b> ভেতরে লিখুন।</p>
+          <div class="row wrap-row">
+            <button type="button" class="btn" id="hlBtn">✨ অটো হাইলাইট</button>
+            <button type="button" class="btn ai" id="aiBtn">🪄 AI দিয়ে হেডলাইন সাজান ও ক্যাপশন লিখুন</button>
+          </div>
+          <div class="ai-out" id="aiOut" hidden>
+            <p class="mini">পছন্দের হেডলাইনে ট্যাপ করুন:</p>
+            <div id="aiHeads" class="chips"></div>
+            <label class="field">
+              <span>ফেসবুক ক্যাপশন</span>
+              <textarea id="aiCaption" rows="4"></textarea>
+            </label>
+            <button type="button" class="btn small" id="copyCaption">ক্যাপশন কপি করুন</button>
+          </div>
+          <p class="status" id="aiStatus" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="card" style="--i:1">
+          <h2><span class="num">৪</span> বাড়তি লেখা <small>(ঐচ্ছিক)</small></h2>
+          <label class="field">
+            <span>উপ-শিরোনাম</span>
+            <input id="subtitle" type="text" maxlength="200" placeholder="এক লাইনের বাড়তি তথ্য">
+          </label>
+          <div class="grid2">
+            <label class="field">
+              <span>ক্যাটাগরি / ট্যাগ</span>
+              <input id="category" type="text" maxlength="30" placeholder="যেমন: ব্রেকিং, বিশেষ">
+            </label>
+            <label class="field">
+              <span>নিচের লাইন</span>
+              <input id="cta" type="text" maxlength="40" placeholder="যেমন: বিস্তারিত কমেন্টে">
+            </label>
+          </div>
+          <label class="field" id="speakerField">
+            <span>বক্তার নাম <em>(উক্তি কার্ডে; উপ-শিরোনাম হবে পরিচয়)</em></span>
+            <input id="speaker" type="text" maxlength="60" placeholder="যেমন: রহিম উদ্দিন">
+          </label>
+          <label class="field">
+            <span>তারিখ <em>(খালি রাখলে দেখাবে না)</em></span>
+            <input id="date" type="text" maxlength="40">
+          </label>
+        </div>
+        <button type="button" class="btn next" data-go="design">পরের ধাপ: ডিজাইন →</button>
+      </section>
+
+      <!-- ৩. ডিজাইন -->
+      <section class="panel" id="p-design" role="tabpanel" aria-labelledby="tab-design" hidden>
+        <div class="card" style="--i:0">
+          <h2><span class="num">৫</span> ডিজাইন বেছে নিন <small id="tplCount"></small></h2>
+          <div class="cats" id="catList" role="group" aria-label="ডিজাইনের ধরন"></div>
+          <div class="tpls" id="tplList" role="listbox" aria-label="টেমপ্লেট"></div>
+        </div>
+        <div class="card" style="--i:1">
+          <h2><span class="num">৬</span> কার্ডের সাইজ</h2>
+          <div class="seg" id="fmtList" role="group" aria-label="সাইজ"></div>
+        </div>
+        <button type="button" class="btn next" data-go="style">পরের ধাপ: ফন্ট ও রং →</button>
+      </section>
+
+      <!-- ৪. ফন্ট ও রং -->
+      <section class="panel" id="p-style" role="tabpanel" aria-labelledby="tab-style" hidden>
+        <div class="card" style="--i:0">
+          <h2><span class="num">৭</span> ফন্ট বেছে নিন</h2>
+          <div class="fonts" id="fontList" role="listbox" aria-label="ফন্ট"></div>
+          <div class="font-add">
+            <button type="button" class="btn small" id="fontAdd">＋ নিজের ফন্ট যোগ করুন</button>
+            <input id="fontFile" type="file" accept=".ttf,.otf,.woff,.woff2" hidden>
+            <p class="hint">ফন্ট ফাইল (.ttf / .otf / .woff) দিলে এই ফোনেই সেভ থাকবে। ফন্টে বাংলা অক্ষর থাকতে হবে।</p>
+          </div>
+        </div>
+        <div class="card" style="--i:1">
+          <h2><span class="num">৮</span> রং ও সাইজ</h2>
+          <div class="field">
+            <span>হাইলাইটের রং</span>
+            <span class="colorrow">
+              <input type="color" id="accent" aria-label="হাইলাইটের রং">
+              <span class="swatches" id="swatches" aria-label="দ্রুত রং"></span>
+              <button type="button" class="btn small" id="accentReset">ব্র্যান্ডের রং</button>
+            </span>
+          </div>
+          <label class="slider wide">লেখার সাইজ <input type="range" id="textScale" min="0.7" max="1.3" step="0.05" value="1"></label>
+        </div>
+      </section>
+
+      <p class="foot">অটো নিউজ কার্ড · আপনার ছবি ও লেখা আপনার ব্রাউজারেই তৈরি হয়, কোথাও জমা থাকে না।</p>
+    </div>
+  </main>
+
+  <!-- ব্র্যান্ড সেটআপ -->
+  <dialog id="brandDlg" aria-labelledby="brandTitle">
+    <form method="dialog" id="brandForm">
+      <h2 id="brandTitle">⚙ ব্র্যান্ড সেটআপ</h2>
+      <p class="hint">একবার সেট করলে সব কার্ডে নিজে থেকে বসবে। তথ্য শুধু এই ডিভাইসের ব্রাউজারে সেভ থাকে।</p>
+      <label class="field"><span>প্রতিষ্ঠানের নাম</span><input id="bName" type="text" maxlength="60" placeholder="যেমন: দৈনিক সকালের খবর"></label>
+      <label class="field"><span>ওয়েবসাইট</span><input id="bSite" type="text" maxlength="80" placeholder="www.yournews.com"></label>
+      <div class="field">
+        <span>লোগো <em>(PNG হলে ভালো, স্বচ্ছ ব্যাকগ্রাউন্ডসহ)</em></span>
+        <div class="logo-row">
+          <div class="logo-prev" id="logoPrev"><span>লোগো নেই</span></div>
+          <div>
+            <button type="button" class="btn small" id="logoPick">লোগো বাছুন</button>
+            <button type="button" class="btn small ghost" id="logoClear" hidden>মুছুন</button>
+          </div>
+        </div>
+        <input id="logoInput" type="file" accept="image/*" hidden>
+      </div>
+      <div class="grid2">
+        <label class="field"><span>মূল ব্র্যান্ড রং</span><input type="color" id="bPrimary"></label>
+        <label class="field"><span>হাইলাইট রং</span><input type="color" id="bAccent"></label>
+      </div>
+      <div class="dlg-actions">
+        <button type="button" class="btn" id="brandCancel">বাতিল</button>
+        <button type="submit" class="btn primary" value="save" id="brandSave">সেভ করুন</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- বড় প্রিভিউ -->
+  <dialog id="viewDlg" class="view" aria-label="বড় প্রিভিউ">
+    <div class="view-in">
+      <img id="viewImg" alt="কার্ডের বড় প্রিভিউ">
+      <div class="view-actions">
+        <button type="button" class="btn primary" id="viewDl">⬇ ডাউনলোড</button>
+        <button type="button" class="btn" id="viewClose">বন্ধ করুন</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ডাউনলোড সফল পপআপ -->
+  <div class="donepop" id="donePop" hidden>
+    <div class="box">
+      <svg class="check" viewBox="0 0 60 60" aria-hidden="true"><circle cx="30" cy="30" r="26"/><path d="M18 31l8 8 16-18"/></svg>
+      <strong>কার্ড তৈরি!</strong>
+      <span>ডাউনলোড শুরু হয়েছে</span>
+      <div class="confetti" id="confetti" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
